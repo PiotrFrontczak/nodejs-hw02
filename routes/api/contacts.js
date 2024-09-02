@@ -72,4 +72,8 @@ router.put('/:contactId', async (req, res, next) => {
   }
 });
 
+const statusSchema = Joi.object({
+  favorite: Joi.boolean().required(),
+});
+
 module.exports = router;
