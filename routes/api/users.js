@@ -7,7 +7,7 @@ const Joi = require('joi');
 
 const router = express.Router();
 
-const SECRET_KEY = process.env.JWT_SECRET || 'your_jwt_secret_key';
+const SECRET_KEY = process.env.JWT_SECRET || 'pvlOEEsUym3IUDRGZ05MwL5VvWxWcZQF';
 
 const signupSchema = Joi.object({
   email: Joi.string().email().required(),
