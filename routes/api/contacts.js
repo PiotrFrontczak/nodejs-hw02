@@ -1,7 +1,7 @@
 const express = require('express');
 const Joi = require('joi');
 const Contact = require('../../models/contact');
-const auth = require('../../middlewares/auth');
+const auth = require('../../middleware/auth');
 
 const router = express.Router();
 
