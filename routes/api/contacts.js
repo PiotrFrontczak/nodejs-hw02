@@ -14,19 +14,89 @@ const contactSchema = Joi.object({
 
 router.get('/', auth, async (req, res, next) => {
   try {
-    const { page = 1, limit = 20, favorite } = req.query;
-    const skip = (page - 1) * limit;
+    const contacts = await Contact.find({ owner: req.user._id });
+    res.status(200).json(contacts);
+  } catch (error) {
+    next(error);
+  }
+});
 
-    const filter = { owner: req.user._id };
-    if (favorite !== undefined) {
-      filter.favorite = favorite === 'true';
+router.get('/:contactId', auth, async (req, res, next) => {
+  try {
+    const contact = await Contact.findOne({ _id: req.params.contactId, owner: req.user._id });
+    if (!contact) {
+      return res.status(404).json({ message: 'Not found' });
+    }
+    res.status(200).json(contact);
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.post('/', auth, async (req, res, next) => {
+  try {
+    const { error } = contactSchema.validate(req.body);
+    if (error) {
+      return res.status(400).json({ message: `missing required ${error.details[0].context.key} field` });
     }
 
-    const contacts = await Contact.find(filter)
-      .skip(skip)
-      .limit(Number(limit));
+    const newContact = await Contact.create({ ...req.body, owner: req.user._id });
+    res.status(201).json(newContact);
+  } catch (error) {
+    next(error);
+  }
+});
 
-    res.status(200).json(contacts);
+router.put('/:contactId', auth, async (req, res, next) => {
+  try {
+    const { error } = contactSchema.validate(req.body);
+    if (error) {
+      return res.status(400).json({ message: 'missing fields' });
+    }
+
+    const updatedContact = await Contact.findOneAndUpdate(
+      { _id: req.params.contactId, owner: req.user._id },
+      req.body,
+      { new: true }
+    );
+    if (!updatedContact) {
+      return res.status(404).json({ message: 'Not found' });
+    }
+    res.status(200).json(updatedContact);
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.delete('/:contactId', auth, async (req, res, next) => {
+  try {
+    const contact = await Contact.findOneAndDelete({ _id: req.params.contactId, owner: req.user._id });
+    if (!contact) {
+      return res.status(404).json({ message: 'Not found' });
+    }
+    res.status(200).json({ message: 'contact deleted' });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.patch('/:contactId/favorite', auth, async (req, res, next) => {
+  try {
+    const { favorite } = req.body;
+    if (favorite === undefined) {
+      return res.status(400).json({ message: 'missing field favorite' });
+    }
+
+    const updatedContact = await Contact.findOneAndUpdate(
+      { _id: req.params.contactId, owner: req.user._id },
+      { favorite },
+      { new: true }
+    );
+    if (!updatedContact) {
+      return res.status(404).json({ message: 'Not found' });
+    }
+
+    res.status(200).json(updatedContact);
   } catch (error) {
     next(error);
   }
