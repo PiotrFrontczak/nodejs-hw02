@@ -1,50 +1,28 @@
-const express = require('express');
-const bcrypt = require('bcryptjs');
-const jwt = require('jsonwebtoken');
-const User = require('../../models/user');
-const auth = require('../../middlewares/auth');
-const Joi = require('joi');
-const gravatar = require('gravatar');
+const multer = require('multer');
+const jimp = require('jimp');
+const path = require('path');
+const fs = require('fs').promises;
 
-const router = express.Router();
+const upload = multer({ dest: 'tmp/' });
 
-const SECRET_KEY = process.env.JWT_SECRET || 'your_jwt_secret_key';
- 
-const signupSchema = Joi.object({
-  email: Joi.string().email().required(),
-  password: Joi.string().min(6).required(),
-});
-
-router.post('/signup', async (req, res, next) => {
+router.patch('/avatars', auth, upload.single('avatar'), async (req, res, next) => {
   try {
-    const { error } = signupSchema.validate(req.body);
-    if (error) {
-      return res.status(400).json({ message: error.details[0].message });
-    }
+    const { path: tempPath, originalname } = req.file;
+    const ext = path.extname(originalname);
+    const newFilename = `${req.user._id}${ext}`;
 
-    const { email, password } = req.body;
-    const existingUser = await User.findOne({ email });
-    if (existingUser) {
-      return res.status(409).json({ message: 'Email in use' });
-    }
+    const avatar = await jimp.read(tempPath);
+    await avatar.resize(350, 350);
+    const avatarPath = path.join(__dirname, '../../public/avatars', newFilename);
+    await avatar.writeAsync(avatarPath); 
 
-    const hashedPassword = await bcrypt.hash(password, 10);
+    await fs.unlink(tempPath);
 
-    const avatarURL = gravatar.url(email, { s: '250', r: 'pg', d: 'mm' });
+    const avatarURL = `/avatars/${newFilename}`;
+    req.user.avatarURL = avatarURL;
+    await req.user.save();
 
-    const newUser = await User.create({
-      email,
-      password: hashedPassword,
-      avatarURL, 
-    });
-
-    res.status(201).json({
-      user: {
-        email: newUser.email,
-        subscription: newUser.subscription,
-        avatarURL: newUser.avatarURL,
-      },
-    });
+    res.status(200).json({ avatarURL });
   } catch (error) {
     next(error);
   }
