@@ -2,8 +2,9 @@ const express = require('express');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const gravatar = require('gravatar');
-const User = require('../../models/user'); 
+const User = require('../../models/user');
 const Joi = require('joi');
+const auth = require('../../middleware/auth'); 
 
 const router = express.Router();
 
