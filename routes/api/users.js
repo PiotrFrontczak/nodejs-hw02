@@ -10,6 +10,14 @@ const router = express.Router();
 
 const SECRET_KEY = process.env.JWT_SECRET;
 
+console.log('JWT_SECRET:', SECRET_KEY); 
+
+if (!SECRET_KEY) {
+  console.error('JWT_SECRET is not defined');
+  process.exit(1); 
+}
+
+
 const signupSchema = Joi.object({
   email: Joi.string().email().required(),
   password: Joi.string().min(6).required(),
