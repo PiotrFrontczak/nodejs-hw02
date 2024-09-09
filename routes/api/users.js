@@ -5,6 +5,12 @@ const gravatar = require('gravatar');
 const User = require('../../models/user');
 const Joi = require('joi');
 const auth = require('../../middleware/auth'); 
+const multer = require('multer');
+const path = require('path');
+const fs = require('fs/promises');
+const jimp = require('jimp'); 
+
+const upload = multer({ dest: 'tmp/' });
 
 const router = express.Router();
 
@@ -104,6 +110,33 @@ router.get('/current', auth, async (req, res, next) => {
   try {
     const { email, subscription } = req.user;
     res.status(200).json({ email, subscription });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.patch('/avatars', auth, upload.single('avatar'), async (req, res, next) => {
+  try {
+    const { path: tempPath, originalname } = req.file;
+    const ext = path.extname(originalname); 
+    const newFilename = `${req.user._id}${ext}`; 
+    const avatarsFolder = path.join(__dirname, '../../public/avatars');
+
+  
+    const avatar = await jimp.read(tempPath);
+    await avatar.resize(250, 250); 
+  
+    const avatarPath = path.join(avatarsFolder, newFilename);
+    
+    await avatar.writeAsync(avatarPath);
+
+    await fs.unlink(tempPath);
+
+    const avatarURL = `/avatars/${newFilename}`;
+    req.user.avatarURL = avatarURL;
+    await req.user.save();
+
+    res.status(200).json({ avatarURL });
   } catch (error) {
     next(error);
   }
