@@ -16,6 +16,10 @@ const router = express.Router();
 
 const SECRET_KEY = process.env.JWT_SECRET;
 
+const { nanoid } = require('nanoid');
+
+const { sendEmail } = require('../../email');
+
 console.log('JWT_SECRET:', SECRET_KEY); 
 
 if (!SECRET_KEY) {
@@ -31,11 +35,6 @@ const signupSchema = Joi.object({
 
 router.post('/signup', async (req, res, next) => {
   try {
-    const { error } = signupSchema.validate(req.body);
-    if (error) {
-      return res.status(400).json({ message: error.details[0].message });
-    }
-
     const { email, password } = req.body;
     const existingUser = await User.findOne({ email });
 
@@ -43,22 +42,25 @@ router.post('/signup', async (req, res, next) => {
       return res.status(409).json({ message: 'Email in use' });
     }
 
-    const hashedPassword = await bcrypt.hash(password, 10);
+    const verificationToken = nanoid();
 
-    const avatarURL = gravatar.url(email, { s: '250', r: 'pg', d: 'mm' });
-
-    const newUser = await User.create({
+    const newUser = new User({
       email,
-      password: hashedPassword,
-      avatarURL,
+      password: await bcrypt.hash(password, 10),
+      verificationToken,
+    });
+
+    await newUser.save();
+
+    const verificationUrl = `http://localhost:3000/api/users/verify/${verificationToken}`;
+    await sendEmail({
+      to: email,
+      subject: 'Verify your email',
+      html: `<p>Click <a href="${verificationUrl}">here</a> to verify your email.</p>`,
     });
 
     res.status(201).json({
-      user: {
-        email: newUser.email,
-        subscription: newUser.subscription,
-        avatarURL: newUser.avatarURL,
-      },
+      message: 'User registered. Check your email to verify your account.',
     });
   } catch (error) {
     next(error);
@@ -89,6 +91,37 @@ router.post('/login', async (req, res, next) => {
         subscription: user.subscription,
       },
     });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.post('/verify', async (req, res, next) => {
+  try {
+    const { email } = req.body;
+
+    if (!email) {
+      return res.status(400).json({ message: 'missing required field email' });
+    }
+
+    const user = await User.findOne({ email });
+
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    if (user.verify) {
+      return res.status(400).json({ message: 'Verification has already been passed' });
+    }
+
+    const verificationUrl = `http://localhost:3000/api/users/verify/${user.verificationToken}`;
+    await sendEmail({
+      to: email,
+      subject: 'Verify your email',
+      html: `<p>Click <a href="${verificationUrl}">here</a> to verify your email.</p>`,
+    });
+
+    res.status(200).json({ message: 'Verification email sent' });
   } catch (error) {
     next(error);
   }
@@ -137,6 +170,25 @@ router.patch('/avatars', auth, upload.single('avatar'), async (req, res, next) =
     await req.user.save();
 
     res.status(200).json({ avatarURL });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.get('/verify/:verificationToken', async (req, res, next) => {
+  try {
+    const { verificationToken } = req.params;
+    const user = await User.findOne({ verificationToken });
+
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    user.verify = true;
+    user.verificationToken = null;
+    await user.save();
+
+    res.status(200).json({ message: 'Verification successful' });
   } catch (error) {
     next(error);
   }
