@@ -1,4 +1,13 @@
 const nodemailer = require('nodemailer');
+const formData = require('form-data');
+const Mailgun = require('mailgun.js');
+
+const mailgun = new Mailgun(formData);
+
+const mg = mailgun.client({
+  username: 'api',
+  key: process.env.MAILGUN_API_KEY,
+});
 
 const transporter = nodemailer.createTransport({
   host: "smtp.mailgun.org",
@@ -12,16 +21,18 @@ const transporter = nodemailer.createTransport({
 
 async function sendEmail({ to, subject, text, html }) {
   try {
-    const info = await transporter.sendMail({
-      from: '"Maddison Foo Koch 👻" <mycomp@gmail.com>', 
-      to, 
+    const domain = process.env.MAILGUN_DOMAIN;
+
+    const response = await mg.messages.create(domain, {
+      from: "Excited User <mailgun@" + domain + ">",
+      to: [to], 
       subject, 
       text, 
       html, 
     });
 
-    console.log("Message sent: %s", info.messageId);
-    return info; 
+    console.log('Message sent: ', response);
+    return response; 
   } catch (error) {
     console.error("Error sending email:", error);
     throw error;
